@@ -29,7 +29,16 @@ const mono = IBM_Plex_Mono({
   display: 'swap',
 });
 
-const SITE_URL = 'https://society-of-spills.vercel.app';
+// Resolve the canonical URL from the environment so OG/Twitter image URLs are
+// always absolute-correct on whatever domain the site is deployed to.
+// Order: explicit override → Vercel production domain → current deploy → local fallback.
+const SITE_URL =
+  process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_PROJECT_PRODUCTION_URL
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://sos-nine-lovat.vercel.app');
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),

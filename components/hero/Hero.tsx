@@ -68,10 +68,10 @@ export function Hero() {
               </span>
             </motion.div>
 
-            <h1 className="display text-ink">
-              <span className="sr-only">
-                S.O.S. — For everyday emergencies.
-              </span>
+            <h1
+              className="display text-ink"
+              aria-label="S.O.S. — For everyday emergencies."
+            >
               <span className="block overflow-hidden" aria-hidden>
                 <motion.span variants={line} className="block">
                   <Wordmark className="text-[clamp(4.5rem,16vw,13rem)]" />

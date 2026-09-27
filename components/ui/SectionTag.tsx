@@ -1,14 +1,17 @@
 import { clsx } from '@/lib/clsx';
 
-/** Institutional section label, e.g. "02 / THE PROBLEM". */
+/**
+ * Institutional section eyebrow — a field-file marker, no fake ordinal sequence.
+ * `code` is an optional short brand reference (not a 01/02/03 counter).
+ */
 export function SectionTag({
-  index,
-  title,
+  label,
+  code,
   className,
   tone = 'ink',
 }: {
-  index: string;
-  title: string;
+  label: string;
+  code?: string;
   className?: string;
   tone?: 'ink' | 'bone';
 }) {
@@ -16,9 +19,17 @@ export function SectionTag({
   const rule = tone === 'bone' ? 'bg-bone/40' : 'bg-ink/30';
   return (
     <div className={clsx('flex items-center gap-3 tech', color, className)}>
-      <span className="tabular-nums">{index}</span>
-      <span className={clsx('h-px w-8', rule)} aria-hidden />
-      <span>{title}</span>
+      <span
+        aria-hidden
+        className={clsx('h-2 w-2', tone === 'bone' ? 'bg-bone' : 'bg-signal')}
+      />
+      <span>{label}</span>
+      {code && (
+        <>
+          <span className={clsx('h-px w-8', rule)} aria-hidden />
+          <span className="opacity-60">{code}</span>
+        </>
+      )}
     </div>
   );
 }

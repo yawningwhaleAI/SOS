@@ -59,11 +59,11 @@ export function DesignSystem() {
   return (
     <section
       id="system"
-      className="relative scroll-mt-20 bg-bone py-20 text-ink sm:py-28"
+      className="relative scroll-mt-20 bg-bone pb-16 pt-24 text-ink sm:pb-20 sm:pt-32"
     >
       <div className="mx-auto max-w-wide px-4 sm:px-6 lg:px-10">
         <Reveal>
-          <SectionTag index="06" title="The Design System" />
+          <SectionTag label="The System" code="Packaging Anatomy" />
         </Reveal>
 
         <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-12 lg:items-end">

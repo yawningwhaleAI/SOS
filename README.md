@@ -40,25 +40,36 @@ The build is fully static/brand — **no environment variables are required**.
 
 ## Project structure
 
+Five sections, deliberately lean for a pre-launch brand:
+
 ```
 app/                     App Router entry, global styles, SEO metadata
 components/
   navigation/            Sticky nav + mobile menu
-  hero/                  Section 01 — Emergency alert / hero
-  problem/               Section 02 — The problem
-  story/                 Sections 03 & 04 — The Society + Our Response
-  products/              Section 05 — Response Units (cards + detail modal)
-  design-system/         Section 06 — Interactive packaging anatomy
-  sustainability/        Section 07 — System extensions (RE: / Bamboo)
-  attitude/              Section 08 — Kinetic brand statements
-  join/                  Section 09 — Join the Society (email signup)
-  footer/                Section 10 — Footer (back-of-pack)
+  hero/                  01 — Emergency alert / hero
+  problem/               02 — The Problem (+ the Society story, folded in)
+  products/              03 — Response Units (cards + detail modal)
+  design-system/         04 — The System: interactive packaging anatomy
+  sustainability/        04 — Sustainability band (RE: / Bamboo), tail of The System
+  join/                  05 — Join: consumer signup + separate trade enquiry
+  footer/                Footer (back-of-pack)
   ui/                    Shared primitives (Reveal, Ticker, HazardBar, …)
 data/
-  products.ts            Single source of truth for the four products
+  products.ts            Single source of truth for the four products + spec note
 lib/                     Small helpers
 public/products/         Optimized product photography (WebP)
+.claude/skills/          Vendored design skills (frontend-design, high-end-visual-design)
+CLAUDE.md                Brand + design law (read this before changing the design)
 ```
+
+### Design decisions worth knowing
+- **Specs are indicative.** Only Facial GSM (42) is confirmed on-pack; Pocket/Kitchen/Car
+  GSM and two sheet sizes are industry-standard placeholders flagged as indicative in
+  `data/products.ts`. Swap in certified figures there — nothing else changes.
+- **OG image URL** auto-derives from Vercel env (`VERCEL_PROJECT_PRODUCTION_URL`), so
+  social shares always point at the live domain. Override with `NEXT_PUBLIC_SITE_URL`.
+- **Contact** routes to `aryann.singh21@gmail.com`; institutions have a separate
+  trade-enquiry mailto.
 
 ### Changing products
 

@@ -6,9 +6,9 @@ import { Wordmark } from '@/components/ui/Wordmark';
 import { clsx } from '@/lib/clsx';
 
 const LINKS = [
-  { label: 'The Society', href: '#society' },
+  { label: 'The Problem', href: '#problem' },
   { label: 'Response Units', href: '#response-units' },
-  { label: 'Our System', href: '#system' },
+  { label: 'The System', href: '#system' },
   { label: 'Sustainability', href: '#sustainability' },
 ];
 

@@ -1,6 +1,9 @@
 import { Wordmark } from '@/components/ui/Wordmark';
 import { HazardBar } from '@/components/ui/HazardBar';
 
+const TRADE_MAILTO =
+  'mailto:aryann.singh21@gmail.com?subject=S.O.S.%20supply%20enquiry';
+
 const COLS = [
   {
     title: 'Response Units',
@@ -14,25 +17,24 @@ const COLS = [
   {
     title: 'The Society',
     links: [
-      { label: 'Our Story', href: '#society' },
-      { label: 'Our System', href: '#system' },
-      { label: 'Why S.O.S.', href: '#why' },
+      { label: 'The Problem', href: '#problem' },
+      { label: 'The System', href: '#system' },
+      { label: 'Sustainability', href: '#sustainability' },
     ],
   },
   {
-    title: 'System',
+    title: 'Trade',
     links: [
-      { label: 'Sustainability', href: '#sustainability' },
-      { label: 'S.O.S. RE:', href: '#sustainability' },
-      { label: 'S.O.S. Bamboo', href: '#sustainability' },
+      { label: 'Supply enquiry', href: TRADE_MAILTO },
+      { label: 'Hotels · Cafés · Offices', href: TRADE_MAILTO },
+      { label: 'Join the Society', href: '#join' },
     ],
   },
   {
     title: 'Contact',
     links: [
-      { label: 'hello@societyofspills.com', href: 'mailto:hello@societyofspills.com' },
-      { label: 'Join The Society', href: '#join' },
-      { label: 'Back To Top', href: '#top' },
+      { label: 'aryann.singh21@gmail.com', href: 'mailto:aryann.singh21@gmail.com' },
+      { label: 'Back to top', href: '#top' },
     ],
   },
 ];
