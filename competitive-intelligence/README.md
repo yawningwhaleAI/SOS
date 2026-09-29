@@ -21,8 +21,8 @@ Full spec and step plan: [`CLAUDE.md`](./CLAUDE.md). Work **one step at a time**
 | 0 | Setup — repo, configs, empty DB with schema | ✅ done (auth verified: acct `yawningwhale`) |
 | 1 | Actor evaluation — winner chosen per platform, tiny scored test | ✅ done (~$0.39 spent; see `config/actors.yaml`) |
 | 2 | Manual accuracy check (≥95% on MRP/SP/pack size) | 🟡 worksheet generated — **awaiting Aryan's manual verification** |
-| 3 | NCR pilot (1 week) + variance decision | ⬜ needs Step 2 pass, + real scraper runners |
-| 4 | National baseline (36 locations) | ⬜ |
+| 3 | NCR pilot + variance decision | ✅ budget slice done (1,309 rows, $0.43) → **4 localities/city is enough**. See `PILOT_FINDINGS.md` |
+| 4 | National baseline (36→ ~32 locations) | ⬜ needs Apify budget decision (exceeds $5 free tier) |
 | 5 | Analysis outputs (Excel + charts) | ⬜ |
 | 6 | Physical teardown (GSM/sheet size, manual) | ⬜ |
 

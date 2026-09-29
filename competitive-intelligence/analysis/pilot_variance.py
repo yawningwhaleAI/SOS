@@ -79,7 +79,6 @@ def main() -> int:
     tier_brands = defaultdict(set)
     for r in rows:
         if r["brand_raw"]:
-            tier_brands[r["affluence_tier"]][:0]  # noop to keep type
             tier_brands[r["affluence_tier"]].add(norm(r["brand_raw"]))
     all_tiers = ["premium", "upper_mid", "mid", "new_suburb"]
     for t in all_tiers:
