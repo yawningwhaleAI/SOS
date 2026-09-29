@@ -1,0 +1,13 @@
+# S.O.S. Competitive Intelligence Pipeline — Python deps (pilot).
+# Pin loosely for the pilot; tighten before the national run.
+
+apify-client>=1.7,<2      # Apify actors (acquisition layer)
+pandas>=2.2               # cleaning / analysis
+PyYAML>=6.0               # config files
+python-dotenv>=1.0        # load APIFY_TOKEN from .env
+openpyxl>=3.1             # Excel exports (analysis/ Step 5)
+matplotlib>=3.8           # charts (PNG) for Step 5
+rapidfuzz>=3.9            # token similarity for fuzzy SKU matching (spec §10.2)
+
+# stdlib sqlite3 is used for the pilot DB — no driver needed.
+# DuckDB is an optional upgrade for analytics; not required for the pilot.

@@ -29,3 +29,19 @@ yarn-error.log*
 
 # typescript
 *.tsbuildinfo
+
+# --- competitive-intelligence (Python scraper) ---
+competitive-intelligence/.env
+competitive-intelligence/.venv/
+competitive-intelligence/__pycache__/
+competitive-intelligence/**/__pycache__/
+competitive-intelligence/*.pyc
+# raw Apify payloads, built DB, exports and human-review queue are local artifacts
+competitive-intelligence/raw_data/**
+!competitive-intelligence/raw_data/.gitkeep
+competitive-intelligence/data/*.db
+competitive-intelligence/exports/**
+!competitive-intelligence/exports/.gitkeep
+competitive-intelligence/review_queue/**
+!competitive-intelligence/review_queue/.gitkeep
+competitive-intelligence/logs/run_log.csv

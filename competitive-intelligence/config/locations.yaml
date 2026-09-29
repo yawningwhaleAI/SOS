@@ -1,0 +1,78 @@
+# Locations (spec §7). 36 localities across 8 tier-1 cities, stratified by
+# affluence. NCR is weighted higher (8) because it is the launch beachhead.
+#
+# IMPORTANT (spec §7): each locality is a PROPOSAL. Before any real run, the
+# scraper must confirm the locality is serviceable on each platform, resolve
+# it to a store_id / pincode, and log the resolved value. Swap any
+# unserviceable locality for the nearest equivalent in the same tier.
+#
+# `resolved` blocks are filled in during Step 1/Step 3, per platform. They are
+# left null here so we never pretend a location was verified when it wasn't.
+
+affluence_tiers: [premium, upper_mid, mid, new_suburb]
+
+cities:
+  delhi_ncr:            # weighted higher: 8 localities
+    weight: 8
+    localities:
+      - {name: Greater Kailash,            tier: premium}
+      - {name: Golf Course Road Gurugram,  tier: premium}
+      - {name: Vasant Kunj,                tier: upper_mid}
+      - {name: Sector 50 Noida,            tier: upper_mid}
+      - {name: Mayur Vihar Phase 1,        tier: mid}
+      - {name: Dwarka,                     tier: new_suburb}
+      - {name: Sohna Road Gurugram,        tier: new_suburb}
+      - {name: Greater Noida West,         tier: new_suburb}
+  mumbai:
+    weight: 4
+    localities:
+      - {name: Bandra West,   tier: premium}
+      - {name: Powai,         tier: upper_mid}
+      - {name: Borivali West, tier: mid}
+      - {name: Thane West,    tier: new_suburb}
+  bengaluru:
+    weight: 4
+    localities:
+      - {name: Indiranagar, tier: premium}
+      - {name: Koramangala, tier: upper_mid}
+      - {name: Jayanagar,   tier: mid}
+      - {name: Whitefield,  tier: new_suburb}
+  hyderabad:
+    weight: 4
+    localities:
+      - {name: Jubilee Hills, tier: premium}
+      - {name: Gachibowli,    tier: upper_mid}
+      - {name: Kukatpally,    tier: mid}
+      - {name: Kompally,      tier: new_suburb}
+  chennai:
+    weight: 4
+    localities:
+      - {name: Adyar,                  tier: premium}
+      - {name: Anna Nagar,             tier: upper_mid}
+      - {name: Velachery,              tier: mid}
+      - {name: Sholinganallur OMR,     tier: new_suburb}
+  kolkata:
+    weight: 4
+    localities:
+      - {name: Ballygunge, tier: premium}
+      - {name: Salt Lake,  tier: upper_mid}
+      - {name: Behala,     tier: mid}
+      - {name: New Town,   tier: new_suburb}
+  pune:
+    weight: 4
+    localities:
+      - {name: Koregaon Park, tier: premium}
+      - {name: Baner,         tier: upper_mid}
+      - {name: Kothrud,       tier: mid}
+      - {name: Wakad,         tier: new_suburb}
+  ahmedabad:
+    weight: 4
+    localities:
+      - {name: Bodakdev,  tier: premium}
+      - {name: Satellite, tier: upper_mid}
+      - {name: Maninagar, tier: mid}
+      - {name: Gota,      tier: new_suburb}
+
+# Filled during resolution. One entry per (city, locality, platform).
+# schema: {city, locality, platform, serviceable, store_id, pincode_resolved, checked_at}
+resolved: []

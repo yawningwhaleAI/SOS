@@ -1,0 +1,41 @@
+# Search queries (spec §6). Scrape SEARCH RESULT PAGES, not a fixed product
+# list, so we capture new SKUs, rank and sponsored slots.
+#
+# Caps (spec §6):
+#   quick_commerce: 60 results per (query x location)
+#   ecommerce:      100 results per (query x location)
+# Only tissue/paper results are kept after relevance filtering (spec §9.7).
+
+caps:
+  quick_commerce: 60
+  ecommerce: 100
+
+queries:
+  facial:
+    - facial tissue
+    - tissue box
+    - face tissue
+  pocket:
+    - pocket tissue
+  car:
+    - car tissue
+  kitchen:
+    - kitchen towel
+    - kitchen roll
+    - paper towel
+  toilet:
+    - toilet roll
+    - toilet paper
+    - toilet tissue
+  napkin:
+    - paper napkins
+    - serviettes
+  wipes:
+    - wet wipes
+  kitchen_paper:
+    - air fryer liner
+    - air fryer paper
+    - baking paper
+    - butter paper
+    - parchment paper
+    - food wrap paper

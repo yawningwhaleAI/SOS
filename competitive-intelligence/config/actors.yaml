@@ -1,0 +1,59 @@
+# Chosen Apify actor per platform + input template (spec §4, §5, §11 Step 1).
+#
+# These are LEFT UNSET until Step 1 (actor evaluation) picks a winner per
+# platform against the scorecard. Do not fill in an actor id here by guessing —
+# Step 1 shortlists 2 actors per platform, runs a tiny test, scores them, and
+# only then records the winner below with its measured cost and pass/fail notes.
+#
+# Scorecard (spec §11 Step 1):
+#   required : MRP and SP returned separately
+#   required : pack size / quantity text returned
+#   required (QC): location control works (results change with location)
+#   preferred: store_id / resolved location returned
+#   preferred: stock status, rating, review count
+#   preferred: search rank / sponsored flag
+#   record   : cost per 1,000 results; run success, errors, speed
+
+platforms:
+  blinkit:
+    type: quick_commerce
+    location_handling: per_dark_store   # store_id <-> pincode; record store_id
+    chosen_actor: null                  # set in Step 1
+    candidates: []                      # [{actor_id, notes}] filled during evaluation
+    input_template: {}                  # actor-specific input; filled in Step 1
+
+  zepto:
+    type: quick_commerce
+    location_handling: locality_or_pincode   # geocoded by actor; record resolved
+    chosen_actor: null
+    candidates: []
+    input_template: {}
+
+  instamart:
+    type: quick_commerce
+    location_handling: locality_or_pincode
+    chosen_actor: null
+    candidates: []
+    input_template: {}
+
+  amazon:
+    type: ecommerce
+    location_handling: pincode          # Delhi + Mumbai
+    chosen_actor: null
+    candidates: []
+    input_template: {}
+
+  flipkart:
+    type: ecommerce
+    location_handling: pincode
+    chosen_actor: null
+    candidates: []
+    input_template: {}
+
+# Global run guardrails (spec §2)
+guardrails:
+  spend_cap_usd: null                   # MUST be set by Aryan before Step 1
+  public_pages_only: true
+  no_logins: true
+  no_captcha_bypass: true
+  stop_if_run_exceeds_cap: true
