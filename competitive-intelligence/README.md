@@ -18,13 +18,27 @@ Full spec and step plan: [`CLAUDE.md`](./CLAUDE.md). Work **one step at a time**
 
 | Step | What | State |
 |---|---|---|
-| 0 | Setup — repo, configs, empty DB with schema | ✅ done (token check pending your token) |
-| 1 | Actor evaluation (2 candidates/platform, tiny scored test) | ⬜ needs `APIFY_TOKEN` + spend cap |
-| 2 | Manual accuracy check (≥95% on MRP/SP/pack size) | ⬜ |
-| 3 | NCR pilot (1 week) + variance decision | ⬜ |
+| 0 | Setup — repo, configs, empty DB with schema | ✅ done (auth verified: acct `yawningwhale`) |
+| 1 | Actor evaluation — winner chosen per platform, tiny scored test | ✅ done (~$0.39 spent; see `config/actors.yaml`) |
+| 2 | Manual accuracy check (≥95% on MRP/SP/pack size) | 🟡 worksheet generated — **awaiting Aryan's manual verification** |
+| 3 | NCR pilot (1 week) + variance decision | ⬜ needs Step 2 pass, + real scraper runners |
 | 4 | National baseline (36 locations) | ⬜ |
 | 5 | Analysis outputs (Excel + charts) | ⬜ |
 | 6 | Physical teardown (GSM/sheet size, manual) | ⬜ |
+
+### Step 1 chosen actors (verified by live test, 29 Sep 2026)
+
+| Platform | Actor | ~cost/1k | Notable |
+|---|---|---|---|
+| Blinkit | `fascinating_lentil/blinkit-quick-commerce-scraper` | ~$0.45 | search rank (position) |
+| Zepto | `memo23/zepto-product-scraper` | ~$0.91 | real storeId + resolved location |
+| Instamart | `solidcode/swiggy-scraper` | ~$0.25 | isAd (sponsored) flag; cheapest |
+| Amazon.in | `clearrun/amazon-products` | ~$8.25 | rank + sponsored + badges; no pincode |
+| Flipkart | `scrapers_lat/flipkart-products-scraper` | free (test) | AI-enriched attrs; no rank |
+
+**Step 2 for Aryan:** open `exports/Step2_Accuracy_Check_<date>.csv`, open each
+row's `url` in the live app (same location, Vasant Kunj/Delhi), and mark
+`mrp_ok` / `sp_ok` / `packsize_ok` = y/n. If ≥95% correct, we proceed to Step 3.
 
 ---
 

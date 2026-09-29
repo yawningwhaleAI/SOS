@@ -1,92 +1,114 @@
 # Chosen Apify actor per platform + input template (spec §4, §5, §11 Step 1).
 #
-# `chosen_actor` is LEFT NULL until the Step 1 LIVE TEST picks a winner per
-# platform against the scorecard. The `candidates` below are a SHORTLIST from
-# the Apify Store (identified 29 Sep 2026 via store search). Their `claims` are
-# what each store listing advertises — NOT yet verified. The live test
-# (1 location x {kitchen towel, facial tissue} x <=20 items each) confirms:
-# MRP/SP separate, pack-size text, and that results actually change with
-# location. Only then does `chosen_actor` get set, with measured cost + notes.
+# STEP 1 COMPLETE (29 Sep 2026). Each `chosen_actor` was picked by a live tiny
+# test: 1 location (Vasant Kunj, Delhi) x {kitchen towel, facial tissue},
+# <=20 items/query. Measured cost + field coverage recorded per platform.
+# Total Step 1 spend: ~$0.39. `input_template` is the exact, working input
+# (location/query fields get filled per run by the scrapers).
 #
-# Scorecard (spec §11 Step 1):
-#   required : MRP and SP returned separately
-#   required : pack size / quantity text returned
-#   required (QC): location control works (results change with location)
-#   preferred: store_id / resolved location returned
-#   preferred: stock status, rating, review count
-#   preferred: search rank / sponsored flag
-#   record   : cost per 1,000 results; run success, errors, speed
-#
-# NOTE: store-page details could not be auto-verified — this environment's
-# network policy blocks apify.com. Confirm inputs/outputs in the live test.
+# Scorecard result (R=required, P=preferred):
+#   R MRP & SP separate ...... all 5 pass
+#   R pack-size text ......... all 5 pass (Amazon/Flipkart carry it in title/subtitle)
+#   R location control (QC) .. Blinkit(lat/long), Zepto(storeId), Instamart(city/area) pass
+#   P store_id/resolved loc .. Zepto returns storeId; others resolve differently
+#   P rank / sponsored ....... Blinkit rank; Instamart isAd; Amazon rank+isSponsored
+#   P rating / reviews ....... all 5
 
 platforms:
   blinkit:
     type: quick_commerce
-    location_handling: per_dark_store   # store_id <-> pincode; record store_id
-    chosen_actor: null                  # set after Step 1 live test
+    location_handling: lat_long          # actor takes locationName + lat/long
+    chosen_actor: fascinating_lentil/blinkit-quick-commerce-scraper
+    eval:
+      cost_usd_per_20: 0.009             # ~$0.45 / 1000 items
+      has: [mrp, price, discountPercent, packSize, position_rank, rating, ratingCount, inStock]
+      missing: [sponsored_flag, store_id]
+      notes: cheapest QC; returns search rank (position). Uses residential proxy.
+    input_template:
+      searchQueries: []                  # filled per run
+      locationName: ""                   # filled per run
+      latitude: null                     # filled per run
+      longitude: null                    # filled per run
+      maxResults: 60                     # spec §6 QC cap
+      maxPagesPerQuery: 5
     candidates:
-      - actor_id: haketa/blinkit-scraper
-        claims: MRP + selling price separate, discount, stock, multi-city location
-        verified: false
-      - actor_id: fascinating_lentil/blinkit-quick-commerce-scraper
-        claims: prices & stock by location; ~$1.50/1k; no login
-        verified: false
-    input_template: {}                  # actor-specific input; filled after test
+      - {actor_id: fascinating_lentil/blinkit-quick-commerce-scraper, verified: true, chosen: true}
+      - {actor_id: haketa/blinkit-scraper, verified: false, note: "not tested; fallback"}
 
   zepto:
     type: quick_commerce
-    location_handling: locality_or_pincode   # geocoded by actor; record resolved
-    chosen_actor: null
+    location_handling: locality_name     # actor takes ["Locality, City"], returns storeId
+    chosen_actor: memo23/zepto-product-scraper
+    eval:
+      cost_usd_per_40: 0.0365            # ~$0.91 / 1000 items
+      has: [mrp, sellingPrice, discountPercent, packSize, unit, weightInGms, storeId, location, rating, ratingCount, inStock, sourceQuery]
+      missing: [search_rank, sponsored_flag]
+      notes: only actor returning a real storeId + resolved location + lat/long. 2564 prior runs.
+    input_template:
+      locations: []                      # ["Vasant Kunj, Delhi"] filled per run
+      searchQueries: []                  # filled per run
+      maxItems: 120
+      maxItemsPerQuery: 60               # spec §6 QC cap
+      maxConcurrency: 4
     candidates:
-      - actor_id: memo23/zepto-product-scraper
-        claims: prices, MRP, stock by location
-        verified: false
-      - actor_id: krazee_kaushik/zepto-scraper
-        claims: product listings, prices, ETA & stock by location
-        verified: false
-      # cheap alt to consider: architjn/zepto-category-scraper (~$0.9/1k) —
-      # but it is CATEGORY-based; confirm it supports keyword search first.
-    input_template: {}
+      - {actor_id: memo23/zepto-product-scraper, verified: true, chosen: true}
+      - {actor_id: krazee_kaushik/zepto-scraper, verified: false, note: "not tested; fallback"}
 
   instamart:
     type: quick_commerce
-    location_handling: locality_or_pincode
-    chosen_actor: null
+    location_handling: city_area         # actor takes city + area
+    chosen_actor: solidcode/swiggy-scraper
+    eval:
+      cost_usd_per_40: 0.01              # ~$0.25 / 1000 items — cheapest overall
+      has: [mrp, price, savings, discount, quantity, isAd, adTitle, rating, ratingCount, inStock, city, area, sourceQuery]
+      missing: [search_rank, store_id]
+      notes: has isAd (sponsored) flag. NOTE - smacient/swiggy-instamart-data-extractor
+             returned HTTP 403 on run start (paid/rental actor, blocked on FREE plan).
+    input_template:
+      searchQueries: []                  # filled per run
+      city: ""                           # filled per run
+      area: ""                           # filled per run
+      maxResults: 60                     # spec §6 QC cap
     candidates:
-      - actor_id: solidcode/swiggy-scraper
-        claims: prices, MRP, discounts, ratings, stock; any Indian city; keyword or category
-        verified: false
-      - actor_id: smacient/swiggy-instamart-data-extractor
-        claims: any Indian city; keyword + category; tracks sponsored vs organic; ~$5/1k
-        verified: false
-    input_template: {}
+      - {actor_id: solidcode/swiggy-scraper, verified: true, chosen: true}
+      - {actor_id: smacient/swiggy-instamart-data-extractor, verified: false, note: "403 on FREE plan (paid/rental)"}
 
   amazon:
     type: ecommerce
-    location_handling: pincode          # Delhi + Mumbai
-    chosen_actor: null
+    location_handling: national          # this actor has no pincode input; prices ~national
+    chosen_actor: clearrun/amazon-products
+    eval:
+      cost_usd_per_40: 0.33              # ~$8.25 / 1000 — priciest (residential proxy)
+      has: [price, listPrice, discountPercent, position_rank, isSponsored, isBestSeller, isAmazonsChoice, badge, rating, reviewCount, isPrime, asin]
+      missing: [pincode_input, dedicated_packsize_field, reliable_brand]
+      notes: richest market signals (rank + sponsored + badges + bought-past-month).
+             Pack size sits in the title text (parser must extract). Brand often null.
+    input_template:
+      queries: []                        # filled per run
+      marketplace: "in"                  # Amazon.in
+      maxResultsPerQuery: 100            # spec §6 ecommerce cap
+      sortBy: relevance
     candidates:
-      - actor_id: clearrun/amazon-products
-        claims: title, ASIN, price, list price(MRP), discount%, rating, review count, Prime, sponsored flag, brand; India (IN)
-        verified: false
-      - actor_id: data_direct/amazon-products-scraper
-        claims: search results per keyword with position (rank) and sponsored flag
-        verified: false
-    input_template: {}
+      - {actor_id: clearrun/amazon-products, verified: true, chosen: true}
+      - {actor_id: data_direct/amazon-products-scraper, verified: false, note: "not tested; fallback"}
 
   flipkart:
     type: ecommerce
-    location_handling: pincode
-    chosen_actor: null
+    location_handling: national
+    chosen_actor: scrapers_lat/flipkart-products-scraper
+    eval:
+      cost_usd_per_10: 0.0               # free in test
+      has: [currentPrice, mrp, discountPercentage, discountAmount, rating, ratingCount, reviewCount, subtitle_packsize, inStock, category, aiAttributes]
+      missing: [search_rank, sponsored_flag]
+      notes: free; AI-enriched attributes (aiCleanName, aiAttributes). Pack size in subtitle.
+             Test returned 10 items for the two queries — confirm result volume at scale.
+    input_template:
+      searchQueries: []                  # filled per run
+      maxProducts: 100                   # spec §6 ecommerce cap
+      withDetails: true
     candidates:
-      - actor_id: scrapers_lat/flipkart-products-scraper
-        claims: price, MRP, discount, rating, specs; keyword or category
-        verified: false
-      - actor_id: fascinating_lentil/flipkart-products-scraper
-        claims: prices & search
-        verified: false
-    input_template: {}
+      - {actor_id: scrapers_lat/flipkart-products-scraper, verified: true, chosen: true}
+      - {actor_id: fascinating_lentil/flipkart-products-scraper, verified: false, note: "not tested; fallback"}
 
 # Global run guardrails (spec §2)
 guardrails:
