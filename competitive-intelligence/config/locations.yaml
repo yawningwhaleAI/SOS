@@ -14,15 +14,18 @@ affluence_tiers: [premium, upper_mid, mid, new_suburb]
 cities:
   delhi_ncr:            # weighted higher: 8 localities
     weight: 8
+    # city/area feed Instamart; lat/lng feed Blinkit; "name, city" feeds Zepto.
+    # Coordinates are approximate locality centroids (good enough for dark-store
+    # resolution); the actor returns the resolved store/location we actually log.
     localities:
-      - {name: Greater Kailash,            tier: premium}
-      - {name: Golf Course Road Gurugram,  tier: premium}
-      - {name: Vasant Kunj,                tier: upper_mid}
-      - {name: Sector 50 Noida,            tier: upper_mid}
-      - {name: Mayur Vihar Phase 1,        tier: mid}
-      - {name: Dwarka,                     tier: new_suburb}
-      - {name: Sohna Road Gurugram,        tier: new_suburb}
-      - {name: Greater Noida West,         tier: new_suburb}
+      - {name: Greater Kailash,           tier: premium,    city: New Delhi, area: Greater Kailash,      lat: 28.5494, lng: 77.2425}
+      - {name: Golf Course Road Gurugram, tier: premium,    city: Gurugram,  area: Golf Course Road,     lat: 28.4595, lng: 77.0726}
+      - {name: Vasant Kunj,               tier: upper_mid,  city: New Delhi, area: Vasant Kunj,          lat: 28.5200, lng: 77.1591}
+      - {name: Sector 50 Noida,           tier: upper_mid,  city: Noida,     area: Sector 50 Noida,      lat: 28.5710, lng: 77.3600}
+      - {name: Mayur Vihar Phase 1,       tier: mid,        city: New Delhi, area: Mayur Vihar Phase 1,  lat: 28.6060, lng: 77.2910}
+      - {name: Dwarka,                    tier: new_suburb, city: New Delhi, area: Dwarka,               lat: 28.5921, lng: 77.0460}
+      - {name: Sohna Road Gurugram,       tier: new_suburb, city: Gurugram,  area: Sohna Road,           lat: 28.4200, lng: 77.0400}
+      - {name: Greater Noida West,        tier: new_suburb, city: Greater Noida, area: Greater Noida West, lat: 28.6000, lng: 77.4300}
   mumbai:
     weight: 4
     localities:
