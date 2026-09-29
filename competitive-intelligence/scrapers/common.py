@@ -59,13 +59,23 @@ def get_apify_token() -> str:
 
 
 def get_spend_cap_usd() -> float | None:
+    """Per-run spend cap in USD, or None if unset.
+
+    Precedence: SOS_SPEND_CAP_USD in the environment/.env overrides the
+    committed default in config/actors.yaml (guardrails.spend_cap_usd).
+    """
     _load_dotenv()
     raw = os.environ.get("SOS_SPEND_CAP_USD", "").strip()
-    if not raw:
-        return None
+    if raw:
+        try:
+            return float(raw)
+        except ValueError:
+            pass
+    # Fall back to the version-controlled default.
     try:
-        return float(raw)
-    except ValueError:
+        cap = (load_yaml("actors.yaml") or {}).get("guardrails", {}).get("spend_cap_usd")
+        return float(cap) if cap is not None else None
+    except Exception:  # noqa: BLE001 — config is optional/absent pre-Step-0
         return None
 
 

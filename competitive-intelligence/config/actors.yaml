@@ -52,7 +52,9 @@ platforms:
 
 # Global run guardrails (spec §2)
 guardrails:
-  spend_cap_usd: null                   # MUST be set by Aryan before Step 1
+  spend_cap_usd: 5                      # Aryan, 29 Sep 2026 — Apify free tier ($5/mo credit)
+                                         # A run refuses to start if its estimated cost exceeds this.
+                                         # Override per-shell with SOS_SPEND_CAP_USD in .env if needed.
   public_pages_only: true
   no_logins: true
   no_captcha_bypass: true
