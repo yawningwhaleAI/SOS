@@ -1,9 +1,12 @@
 # Chosen Apify actor per platform + input template (spec §4, §5, §11 Step 1).
 #
-# These are LEFT UNSET until Step 1 (actor evaluation) picks a winner per
-# platform against the scorecard. Do not fill in an actor id here by guessing —
-# Step 1 shortlists 2 actors per platform, runs a tiny test, scores them, and
-# only then records the winner below with its measured cost and pass/fail notes.
+# `chosen_actor` is LEFT NULL until the Step 1 LIVE TEST picks a winner per
+# platform against the scorecard. The `candidates` below are a SHORTLIST from
+# the Apify Store (identified 29 Sep 2026 via store search). Their `claims` are
+# what each store listing advertises — NOT yet verified. The live test
+# (1 location x {kitchen towel, facial tissue} x <=20 items each) confirms:
+# MRP/SP separate, pack-size text, and that results actually change with
+# location. Only then does `chosen_actor` get set, with measured cost + notes.
 #
 # Scorecard (spec §11 Step 1):
 #   required : MRP and SP returned separately
@@ -13,41 +16,76 @@
 #   preferred: stock status, rating, review count
 #   preferred: search rank / sponsored flag
 #   record   : cost per 1,000 results; run success, errors, speed
+#
+# NOTE: store-page details could not be auto-verified — this environment's
+# network policy blocks apify.com. Confirm inputs/outputs in the live test.
 
 platforms:
   blinkit:
     type: quick_commerce
     location_handling: per_dark_store   # store_id <-> pincode; record store_id
-    chosen_actor: null                  # set in Step 1
-    candidates: []                      # [{actor_id, notes}] filled during evaluation
-    input_template: {}                  # actor-specific input; filled in Step 1
+    chosen_actor: null                  # set after Step 1 live test
+    candidates:
+      - actor_id: haketa/blinkit-scraper
+        claims: MRP + selling price separate, discount, stock, multi-city location
+        verified: false
+      - actor_id: fascinating_lentil/blinkit-quick-commerce-scraper
+        claims: prices & stock by location; ~$1.50/1k; no login
+        verified: false
+    input_template: {}                  # actor-specific input; filled after test
 
   zepto:
     type: quick_commerce
     location_handling: locality_or_pincode   # geocoded by actor; record resolved
     chosen_actor: null
-    candidates: []
+    candidates:
+      - actor_id: memo23/zepto-product-scraper
+        claims: prices, MRP, stock by location
+        verified: false
+      - actor_id: krazee_kaushik/zepto-scraper
+        claims: product listings, prices, ETA & stock by location
+        verified: false
+      # cheap alt to consider: architjn/zepto-category-scraper (~$0.9/1k) —
+      # but it is CATEGORY-based; confirm it supports keyword search first.
     input_template: {}
 
   instamart:
     type: quick_commerce
     location_handling: locality_or_pincode
     chosen_actor: null
-    candidates: []
+    candidates:
+      - actor_id: solidcode/swiggy-scraper
+        claims: prices, MRP, discounts, ratings, stock; any Indian city; keyword or category
+        verified: false
+      - actor_id: smacient/swiggy-instamart-data-extractor
+        claims: any Indian city; keyword + category; tracks sponsored vs organic; ~$5/1k
+        verified: false
     input_template: {}
 
   amazon:
     type: ecommerce
     location_handling: pincode          # Delhi + Mumbai
     chosen_actor: null
-    candidates: []
+    candidates:
+      - actor_id: clearrun/amazon-products
+        claims: title, ASIN, price, list price(MRP), discount%, rating, review count, Prime, sponsored flag, brand; India (IN)
+        verified: false
+      - actor_id: data_direct/amazon-products-scraper
+        claims: search results per keyword with position (rank) and sponsored flag
+        verified: false
     input_template: {}
 
   flipkart:
     type: ecommerce
     location_handling: pincode
     chosen_actor: null
-    candidates: []
+    candidates:
+      - actor_id: scrapers_lat/flipkart-products-scraper
+        claims: price, MRP, discount, rating, specs; keyword or category
+        verified: false
+      - actor_id: fascinating_lentil/flipkart-products-scraper
+        claims: prices & search
+        verified: false
     input_template: {}
 
 # Global run guardrails (spec §2)
