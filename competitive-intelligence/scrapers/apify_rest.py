@@ -21,18 +21,31 @@ def _token() -> str | None:
     return t or None
 
 
-def _request(path: str, method: str = "GET", body=None):
+def _request(path: str, method: str = "GET", body=None, retries: int = 0):
+    """One API call. With retries>0, transient 5xx / network errors are retried
+    with backoff (use for idempotent GET polling). 4xx are never retried here."""
     url = f"{API}/{path}"
     data = json.dumps(body).encode() if body is not None else None
-    req = urllib.request.Request(url, data=data, method=method)
-    tok = _token()
-    if tok:
-        req.add_header("Authorization", f"Bearer {tok}")
-    if data:
-        req.add_header("Content-Type", "application/json")
-    with urllib.request.urlopen(req, timeout=90) as r:  # noqa: S310 https only
-        raw = r.read().decode("utf-8")
-    return json.loads(raw) if raw else None
+    attempt = 0
+    while True:
+        req = urllib.request.Request(url, data=data, method=method)
+        tok = _token()
+        if tok:
+            req.add_header("Authorization", f"Bearer {tok}")
+        if data:
+            req.add_header("Content-Type", "application/json")
+        try:
+            with urllib.request.urlopen(req, timeout=90) as r:  # noqa: S310 https only
+                raw = r.read().decode("utf-8")
+            return json.loads(raw) if raw else None
+        except urllib.error.HTTPError as e:
+            if e.code >= 500 and attempt < retries:
+                time.sleep(3 * (attempt + 1)); attempt += 1; continue
+            raise
+        except urllib.error.URLError:
+            if attempt < retries:
+                time.sleep(3 * (attempt + 1)); attempt += 1; continue
+            raise
 
 
 def actor_id(slug: str) -> str:
@@ -54,15 +67,15 @@ def wait_for_run(run_id: str, poll_s: int = 4, timeout_s: int = 600) -> dict:
     while waited < timeout_s:
         time.sleep(poll_s)
         waited += poll_s
-        run = _request(f"actor-runs/{run_id}")["data"]
+        run = _request(f"actor-runs/{run_id}", retries=4)["data"]
         if run["status"] in TERMINAL:
             return run
-    return _request(f"actor-runs/{run_id}")["data"]
+    return _request(f"actor-runs/{run_id}", retries=4)["data"]
 
 
 def get_dataset_items(dataset_id: str) -> list[dict]:
     """Return all items (the /items endpoint yields a bare JSON list)."""
-    items = _request(f"datasets/{dataset_id}/items")
+    items = _request(f"datasets/{dataset_id}/items", retries=4)
     return items if isinstance(items, list) else []
 
 
