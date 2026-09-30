@@ -55,6 +55,35 @@ def category_from_query(query: str | None) -> str | None:
     return None
 
 
+# Strong category words as they appear in a PRODUCT NAME, in priority order.
+# A specific format word (napkin, toilet, kitchen, wipe, pocket) beats the
+# generic "tissue"/"facial", so a "Cocktail Napkin Tissue" is a Napkin.
+NAME_CATEGORY_PRIORITY = [
+    ("napkin", "Napkin"), ("serviette", "Napkin"), ("tissue napkin", "Napkin"),
+    ("toilet", "Toilet"), ("toilet roll", "Toilet"),
+    ("kitchen towel", "Kitchen towel"), ("kitchen roll", "Kitchen towel"),
+    ("kitchen tissue", "Kitchen towel"), ("paper towel", "Kitchen towel"),
+    ("wet wipe", "Wipes"), ("wipes", "Wipes"),
+    ("pocket", "Pocket"),
+    ("paper cup", "Paper cup"), ("paper plate", "Paper plate"),
+    ("garbage", "Garbage bag"), ("cling", "Cling wrap"),
+    ("air fryer", "Kitchen paper"), ("baking paper", "Kitchen paper"),
+    ("parchment", "Kitchen paper"), ("butter paper", "Kitchen paper"),
+    ("face tissue", "Facial"), ("facial", "Facial"),
+]
+
+
+def category_from_name(name: str | None) -> str | None:
+    """Category as stated by the PRODUCT NAME (more reliable than the query,
+    which can surface adjacent products). None if the name says nothing specific.
+    """
+    n = (name or "").lower()
+    for kw, cat in NAME_CATEGORY_PRIORITY:
+        if kw in n:
+            return cat
+    return None
+
+
 def parse_ply(text: str) -> int | None:
     m = re.search(r"(\d)\s*-?\s*ply", text, re.I)
     return int(m.group(1)) if m else None
@@ -160,6 +189,23 @@ def parse_pack(text: str) -> dict[str, Any]:
             "note": note}
 
 
+# Known sub-brand / product lines. If present in the name, they keep distinct
+# products (e.g. Origami Klassic vs Luxuria vs So Soft) from merging into one SKU.
+KNOWN_LINES = [
+    "so soft", "sosoft", "klassic", "luxuria", "luxe", "supreme", "premium",
+    "classic", "gold", "naturals", "signature", "elite", "royale", "royal",
+    "ultra", "pro", "max", "everyday", "essential", "chef", "tidy chef",
+]
+
+
+def parse_product_line(name: str | None) -> str | None:
+    n = (name or "").lower()
+    for line in KNOWN_LINES:
+        if line in n:
+            return line.replace(" ", "")
+    return None
+
+
 def parse_all(name: str | None, pack_size: str | None, query: str | None) -> dict[str, Any]:
     """Full attribute parse. `text` = name + pack_size combined for coverage."""
     name = name or ""
@@ -169,8 +215,11 @@ def parse_all(name: str | None, pack_size: str | None, query: str | None) -> dic
     gsm, gsm_basis = parse_gsm(text)
     L, W = parse_dims(text)
     pack = parse_pack(pack_size if re.search(r"\d", pack_size) else text)
+    # Name wins over the search query (the query can surface adjacent products).
+    category = category_from_name(name) or category_from_query(query)
     return {
-        "category": category_from_query(query),
+        "category": category,
+        "product_line": parse_product_line(name),
         "ply": ply,
         "units_per_pack": pack["units_per_pack"],
         "pulls_per_unit": pack["pulls_per_unit"],

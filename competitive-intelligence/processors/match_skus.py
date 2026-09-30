@@ -32,7 +32,9 @@ def deterministic_key(brand: str | None, attrs: dict) -> str:
     ply = attrs.get("ply") or "na"
     units = attrs.get("units_per_pack") or "na"
     pulls = attrs.get("pulls_per_unit") or "na"
-    return f"{norm_brand(brand)}_{cat}_{ply}ply_{units}x{pulls}"
+    line = attrs.get("product_line")
+    line_part = f"_{line}" if line else ""
+    return f"{norm_brand(brand)}_{cat}{line_part}_{ply}ply_{units}x{pulls}"
 
 
 def title_similarity(a: str, b: str) -> float:
