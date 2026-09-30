@@ -58,8 +58,15 @@ def main() -> int:
     conn = sqlite3.connect(DB)
     conn.row_factory = sqlite3.Row
     skus = {r["canonical_sku_id"]: dict(r) for r in conn.execute("SELECT * FROM canonical_skus")}
-    price = [dict(r) for r in conn.execute("SELECT * FROM price_observations")]
+    # ANALYSIS USES CLEAN ROWS ONLY (is_clean=1 set by clean_data.py).
+    has_clean = "is_clean" in {c[1] for c in conn.execute("PRAGMA table_info(price_observations)")}
+    where = "WHERE is_clean=1" if has_clean else ""
+    price = [dict(r) for r in conn.execute(f"SELECT * FROM price_observations {where}")]
     market = [dict(r) for r in conn.execute("SELECT * FROM market_observations")]
+    dq = []
+    if has_clean:
+        dq = conn.execute("SELECT COALESCE(drop_reason,'(clean)') reason, COUNT(*) n "
+                          "FROM price_observations GROUP BY drop_reason ORDER BY n DESC").fetchall()
     conn.close()
     if not price:
         print("No price_observations. Run build_canonical.py first.")
@@ -113,8 +120,12 @@ def main() -> int:
             "Platforms: Blinkit, Zepto, Instamart (quick-commerce). No Amazon/Flipkart yet.",
             "When: single snapshot, 29 Sep 2026, ~11am IST (not multi-day).",
             "Size: 1,309 listings -> 592 canonical SKUs, 6 categories, 89 brands.",
-            "NOT manually verified (Step 2 skipped): a small % of pack/price parses may be wrong.",
-            "~59 SKUs with misparsed multipacks are excluded from ladders (kept in Price_Summary).",
+            "CLEANED: ~11% of raw listings were dropped from analysis (substitutes, non-tissue",
+            "   items, unparseable packs, price outliers). See the Data_Quality sheet for the",
+            "   full breakdown; dropped rows are logged in review_queue/dropped_rows.csv.",
+            "Analysis sheets below use CLEAN rows only (is_clean=1).",
+            "NOT manually verified against live apps (Step 2 skipped): treat as internally",
+            "   consistent, not field-audited.",
             "All figures are MEDIANS across sightings, never averages.",
             "Prefer 'per_100_pulls' (1,163 rows) over 'per_100_ply_sheets' (479 rows, needs ply).",
         ]:
@@ -256,6 +267,25 @@ def main() -> int:
             ws4.append([cat, ply, pack, rank, row[1], row[2], row[3], row[4],
                         row[5], row[6], row[7], row[8], row[9]])
     style_header(ws4)
+
+    # --- Data_Quality (what was dropped and why) ---
+    if dq:
+        wsq = wb.create_sheet("Data_Quality")
+        wsq.append(["drop_reason", "rows", "meaning"])
+        meanings = {
+            "(clean)": "kept for analysis",
+            "substitute": "reusable/cloth/microfiber/non-woven — not paper",
+            "pack_misparse": "pack text unparseable / implausibly few sheets",
+            "sku_price_outlier": "price 3x+ off its SKU median — likely wrong product/price",
+            "not_product": "accessory or non-tissue item (bowl, sanitizer, freshener...)",
+            "sp_gt_mrp": "selling price above MRP (impossible)",
+            "no_price": "no selling price",
+            "per_sheet_too_low": "sheet count overcounted",
+            "name_cat_mismatch": "product name states a different category",
+        }
+        for row in dq:
+            wsq.append([row[0], row[1], meanings.get(row[0], "")])
+        style_header(wsq)
 
     build_readme(wb)  # inserted as the first sheet
     out = EXPORTS / f"SOS_Price_Ladders_{date.today().isoformat()}.xlsx"

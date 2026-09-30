@@ -206,15 +206,73 @@ def parse_product_line(name: str | None) -> str | None:
     return None
 
 
+def _int(m):
+    return int(m.group(1)) if m else None
+
+
+def parse_pack_combined(name: str, pack: str) -> dict[str, Any]:
+    """Resolve units_per_pack & pulls_per_unit using BOTH the name and pack text.
+
+    Real listings put the roll/box count in the pack ("1 pack (2 pcs)",
+    "(6 x 60 pcs)") and the sheets-per-unit in the name ("60 Pulls Per Roll").
+    'pcs' is ambiguous (rolls vs sheets), disambiguated against the name's pull
+    count. Dimensions are NOT parsed here (they'd collide with 'A x B').
+    """
+    n, p = name.lower(), pack.lower().replace("×", "x")
+    units = pulls = None
+    ambiguous = False
+
+    # sheets-per-unit stated in the NAME (most reliable): "60 pulls", "100 sheets"
+    name_pulls = _int(re.search(r"(\d+)\s*(?:pull|sheet|wipe|napkin|tissue)s?\b", n))
+
+    combined = f"{n} {p}"
+    # "160 x 6 Rolls" -> 160 sheets each of 6 rolls (sheets x rolls)
+    m_sr = re.search(r"(\d+)\s*x\s*(\d+)\s*rolls?\b", combined)
+    # "10 packs x 10 sheets" -> 10 units of 10 sheets
+    m_ps = re.search(r"(\d+)\s*packs?\s*x\s*(\d+)\s*(?:sheets?|pulls?|pcs|pieces)\b", combined)
+    # "A x B" inside the PACK only (avoids name dimensions like '30 x 23 cm')
+    mx = re.search(r"(\d+)\s*x\s*(\d+)", p)
+    if m_sr:
+        units, pulls = int(m_sr.group(2)), int(m_sr.group(1))
+    elif m_ps:
+        units, pulls = int(m_ps.group(1)), int(m_ps.group(2))
+    elif mx:
+        units, pulls = int(mx.group(1)), int(mx.group(2))
+    else:
+        # unit (roll/box) count from the pack: "(N pcs)", "pack of N", "N rolls"
+        pack_n = (_int(re.search(r"\((\d+)\s*(?:pcs|pc|rolls?|pieces|packs?)\)", p))
+                  or _int(re.search(r"pack\s*of\s*(\d+)", p))
+                  or _int(re.search(r"(\d+)\s*rolls?\b", p)))
+        n_in_1 = _int(re.search(r"(\d+)\s*in\s*1", n))  # "2 in 1" = 2 rolls
+        if pack_n is not None and name_pulls is not None:
+            # (N pcs) equal to the sheet count -> it's the sheets, single unit
+            units = 1 if pack_n == name_pulls else pack_n
+            pulls = name_pulls
+        elif pack_n is not None:
+            # only a pack count and no name pulls -> N pieces = N sheets, single unit
+            units, pulls = 1, pack_n
+        else:
+            units = n_in_1 or 1
+            pulls = name_pulls
+        if n_in_1 and units == 1 and pack_n is None:
+            units = n_in_1
+
+    if units is None:
+        units = 1
+    total = units * pulls if (units and pulls) else None
+    return {"units_per_pack": units, "pulls_per_unit": pulls,
+            "total_pulls": total, "ambiguous": ambiguous}
+
+
 def parse_all(name: str | None, pack_size: str | None, query: str | None) -> dict[str, Any]:
-    """Full attribute parse. `text` = name + pack_size combined for coverage."""
+    """Full attribute parse."""
     name = name or ""
     pack_size = pack_size or ""
     text = f"{name} {pack_size}".strip()
     ply = parse_ply(text)
     gsm, gsm_basis = parse_gsm(text)
     L, W = parse_dims(text)
-    pack = parse_pack(pack_size if re.search(r"\d", pack_size) else text)
+    pack = parse_pack_combined(name, pack_size)
     # Name wins over the search query (the query can surface adjacent products).
     category = category_from_name(name) or category_from_query(query)
     return {
@@ -235,10 +293,13 @@ def parse_all(name: str | None, pack_size: str | None, query: str | None) -> dic
 if __name__ == "__main__":
     # quick self-test on a few real strings seen in the pilot
     samples = [
-        ("Origami 2 Ply Kitchen Tissue Paper Roll ,60 Pulls Per Roll", "120 Pull x 4", "kitchen towel"),
-        ("Beco Bamboo Super Soft Facial Tissue 100 Pulls (Pack of 6), 600 Pulls 2 ply", "", "facial tissue"),
-        ("Origami Kitchen Towel Roll Non Woven", "80 pulls", "kitchen towel"),
-        ("Wintex Toilet Roll 2 Ply", "6 rolls x 200 pulls", "toilet paper"),
+        ("Origami 2Ply 2 in 1 Kitchen Tissue Roll | 60 Pulls Per Roll", "1 pack (2 pcs)", "kitchen towel"),
+        ("Origami 2Ply 6 in 1 Kitchen Tissue Roll | 60 Pulls", "1 pack (6 x 60 pcs)", "kitchen towel"),
+        ("Origami So Soft Facial Tissues Box | 2 Ply | 100 Pulls", "1 pack (4 x 100 pulls)", "facial tissue"),
+        ("GINNI Superwipe Kitchen Towel Roll | 50 Pulls | 30 x 23 cm", "1 pack (4 pcs)", "kitchen towel"),
+        ("Origami So Soft Facial Tissue Box 100 Pulls", "1 pack (100 pcs)", "facial tissue"),
+        ("Mother Sparsh Water Baby Wipes", "2x72pcs", "wet wipes"),
     ]
     for n, p, q in samples:
-        print(n[:45], "->", parse_all(n, p, q))
+        a = parse_all(n, p, q)
+        print(f"{n[:44]:44} pack='{p}' -> units={a['units_per_pack']} pulls={a['pulls_per_unit']} total={a['total_pulls']}")

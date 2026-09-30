@@ -134,7 +134,9 @@ CREATE TABLE IF NOT EXISTS price_observations (
     price_per_100_ply_sheets REAL,              -- SP / (total_pulls*ply) * 100
     price_per_1000_cm2      REAL,                -- only if dimensions known
     price_per_gram          REAL,                -- only if dims + GSM + basis known
-    mrp_inflation_flag      INTEGER              -- bool: discount_pct > 0.50
+    mrp_inflation_flag      INTEGER,             -- bool: discount_pct > 0.50
+    is_clean                INTEGER,             -- 1 kept for analysis, 0 dropped (set by clean_data.py)
+    drop_reason             TEXT                 -- why a row was dropped (NULL if clean)
 );
 CREATE INDEX IF NOT EXISTS idx_price_sku      ON price_observations(canonical_sku_id);
 CREATE INDEX IF NOT EXISTS idx_price_platform ON price_observations(platform);
