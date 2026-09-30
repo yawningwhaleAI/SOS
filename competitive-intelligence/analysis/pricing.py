@@ -63,6 +63,12 @@ def main() -> int:
     where = "WHERE is_clean=1" if has_clean else ""
     price = [dict(r) for r in conn.execute(f"SELECT * FROM price_observations {where}")]
     market = [dict(r) for r in conn.execute("SELECT * FROM market_observations")]
+    # one representative product URL per SKU, from a CLEAN listing
+    sku_url = {}
+    for r in conn.execute(f"""SELECT p.canonical_sku_id AS sku, r.url AS url
+        FROM price_observations p JOIN raw_observations r ON r.obs_id=p.obs_id
+        {'WHERE p.is_clean=1 AND' if has_clean else 'WHERE'} r.url IS NOT NULL"""):
+        sku_url.setdefault(r["sku"], r["url"])
     dq = []
     if has_clean:
         dq = conn.execute("SELECT COALESCE(drop_reason,'(clean)') reason, COUNT(*) n "
@@ -181,22 +187,37 @@ def main() -> int:
         ws.column_dimensions["C"].width = 90
         return ws
 
+    from openpyxl.styles import Font as _F
+
     def style_header(ws):
         for c in ws[1]:
             c.font = Font(bold=True)
         for i, _ in enumerate(ws[1], 1):
             ws.column_dimensions[get_column_letter(i)].width = 18
 
+    def hyperlink_last_col(ws):
+        """Turn the last column's URL text into clickable links."""
+        col = ws.max_column
+        letter = get_column_letter(col)
+        ws.column_dimensions[letter].width = 48
+        for row in range(2, ws.max_row + 1):
+            cell = ws.cell(row=row, column=col)
+            v = cell.value
+            if isinstance(v, str) and v.startswith("http"):
+                cell.hyperlink = v
+                cell.font = _F(color="0563C1", underline="single")
+
     # --- SKU_Master ---
     ws = wb.active
     ws.title = "SKU_Master"
     ws.append(["canonical_sku_id", "brand", "category", "ply", "units_per_pack",
-               "pulls_per_unit", "total_pulls", "material", "claims", "attr_confidence"])
+               "pulls_per_unit", "total_pulls", "material", "claims", "attr_confidence", "example_url"])
     for sid, s in sorted(skus.items(), key=lambda kv: (kv[1]["category"] or "", kv[1]["brand"] or "")):
         ws.append([sid, s["brand"], s["category"], s["ply"], s["units_per_pack"],
                    s["pulls_per_unit"], s["total_pulls"], s["material"],
-                   ", ".join(json.loads(s["claims"] or "[]")), s["attr_confidence"]])
+                   ", ".join(json.loads(s["claims"] or "[]")), s["attr_confidence"], sku_url.get(sid)])
     style_header(ws)
+    hyperlink_last_col(ws)
 
     # --- Price_Summary (with WHERE it was seen) ---
     ws2 = wb.create_sheet("Price_Summary")
@@ -204,7 +225,7 @@ def main() -> int:
                 "n_obs", "n_localities", "n_platforms", "platforms",
                 "median_SP", "min_SP", "max_SP", "median_discount_pct",
                 "median_per_100_pulls", "median_per_100_ply_sheets",
-                "median_rating", "review_count"])
+                "median_rating", "review_count", "example_url"])
     for k, a in agg.items():
         s = skus.get(k, {})
         sp = a["selling_price"]
@@ -212,14 +233,15 @@ def main() -> int:
                     len(sp), len(locs[k]), len(plats[k]), ", ".join(sorted(plats[k])),
                     med(sp), min(sp) if sp else None, max(sp) if sp else None,
                     med(a["discount_pct"]), med(a["price_per_100_pulls"]),
-                    med(a["price_per_100_ply_sheets"]), rat(k), rev(k)])
+                    med(a["price_per_100_ply_sheets"]), rat(k), rev(k), sku_url.get(k)])
     style_header(ws2)
+    hyperlink_last_col(ws2)
 
     # --- Price_Ladder (per category, fair per-sheet) ---
     ws3 = wb.create_sheet("Price_Ladder")
     ws3.append(["category", "rank", "brand", "canonical_sku_id", "ply", "units_per_pack",
                 "total_pulls", "median_per_100_ply_sheets", "median_per_100_pulls",
-                "median_rating", "review_count", "n_obs"])
+                "median_rating", "review_count", "n_obs", "example_url"])
     by_cat = defaultdict(list)
     excluded = 0
     for k, a in agg.items():
@@ -236,14 +258,16 @@ def main() -> int:
              med(a["price_per_100_pulls"]), rat(k), rev(k), len(a["selling_price"])))
     for cat in sorted(by_cat, key=lambda x: (x or "")):
         for rank, row in enumerate(sorted(by_cat[cat], key=lambda r: r[0]), 1):
-            ws3.append([cat, rank, row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10]])
+            ws3.append([cat, rank, row[1], row[2], row[3], row[4], row[5], row[6], row[7],
+                        row[8], row[9], row[10], sku_url.get(row[2])])
     style_header(ws3)
+    hyperlink_last_col(ws3)
 
     # --- Ladder_by_Ply_Pack (like-for-like segments) ---
     ws4 = wb.create_sheet("Ladder_by_Ply_Pack")
     ws4.append(["category", "ply", "pack", "rank_in_segment", "brand", "canonical_sku_id",
                 "total_pulls", "median_SP", "median_per_100_pulls", "median_per_100_ply_sheets",
-                "median_rating", "review_count", "n_obs"])
+                "median_rating", "review_count", "n_obs", "example_url"])
     seg = defaultdict(list)
     for k, a in agg.items():
         s = skus.get(k, {})
@@ -265,8 +289,9 @@ def main() -> int:
         cat, ply, pack = segkey
         for rank, row in enumerate(sorted(seg[segkey], key=lambda r: r[0]), 1):
             ws4.append([cat, ply, pack, rank, row[1], row[2], row[3], row[4],
-                        row[5], row[6], row[7], row[8], row[9]])
+                        row[5], row[6], row[7], row[8], row[9], sku_url.get(row[2])])
     style_header(ws4)
+    hyperlink_last_col(ws4)
 
     # --- Data_Quality (what was dropped and why) ---
     if dq:
