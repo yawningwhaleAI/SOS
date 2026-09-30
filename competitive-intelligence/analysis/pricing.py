@@ -96,6 +96,80 @@ def main() -> int:
     EXPORTS.mkdir(parents=True, exist_ok=True)
     wb = Workbook()
 
+    def build_readme(wb):
+        ws = wb.create_sheet("READ_ME", 0)
+        bold = Font(bold=True)
+        title = Font(bold=True, size=13)
+        def line(text="", style=None):
+            ws.append([text]);
+            if style: ws.cell(row=ws.max_row, column=1).font = style
+        line("S.O.S. Competitor Price Ladders — data dictionary", title)
+        line()
+        line("SCOPE OF THIS DATA", bold)
+        for t in [
+            "Region: Delhi NCR only. 4 localities, one per affluence tier:",
+            "   Greater Kailash (premium), Vasant Kunj (upper-mid),",
+            "   Mayur Vihar Phase 1 (mid), Dwarka (new suburb).",
+            "Platforms: Blinkit, Zepto, Instamart (quick-commerce). No Amazon/Flipkart yet.",
+            "When: single snapshot, 29 Sep 2026, ~11am IST (not multi-day).",
+            "Size: 1,309 listings -> 592 canonical SKUs, 6 categories, 89 brands.",
+            "NOT manually verified (Step 2 skipped): a small % of pack/price parses may be wrong.",
+            "~59 SKUs with misparsed multipacks are excluded from ladders (kept in Price_Summary).",
+            "All figures are MEDIANS across sightings, never averages.",
+            "Prefer 'per_100_pulls' (1,163 rows) over 'per_100_ply_sheets' (479 rows, needs ply).",
+        ]:
+            line("  " + t)
+        line()
+        defs = [
+            ("SKU_Master — one row per unique product (canonical SKU)", [
+                ("canonical_sku_id", "unique product id: brand_category_Nply_UxP"),
+                ("brand / category", "brand name; Facial/Toilet/Kitchen towel/Napkin/Wipes/Pocket"),
+                ("ply", "number of layers (blank if not stated on listing)"),
+                ("units_per_pack", "rolls/boxes/packs in the pack (e.g. 6)"),
+                ("pulls_per_unit", "sheets per roll/box (e.g. 100)"),
+                ("total_pulls", "units_per_pack x pulls_per_unit = total sheets"),
+                ("material", "virgin/bamboo/recycled/bagasse or not_stated (never guessed from brand)"),
+                ("claims", "parsed marketing claims: soft, eco, absorbent, strong, etc."),
+                ("attr_confidence", "high if pack math resolved (total_pulls known), else low"),
+            ]),
+            ("Price_Summary — one row per SKU: price + where seen + ratings", [
+                ("n_obs", "how many times this SKU was seen (localities x platforms x queries)"),
+                ("n_localities", "how many of the 4 NCR localities it appeared in"),
+                ("n_platforms", "how many of the 3 apps carry it"),
+                ("platforms", "which apps (blinkit/zepto/instamart)"),
+                ("median_SP", "median selling price (the REAL price paid), in Rupees"),
+                ("min_SP / max_SP", "cheapest / priciest sighting -> price volatility"),
+                ("median_discount_pct", "typical discount off MRP (0.34 = 34% off)"),
+                ("median_per_100_pulls", "price for 100 sheets = SP / total_pulls x 100 (KEY compare metric)"),
+                ("median_per_100_ply_sheets", "ply-adjusted: SP / (total_pulls x ply) x 100 (fairest, needs ply)"),
+                ("median_rating", "median star rating (out of 5)"),
+                ("review_count", "max review/rating count seen (popularity proxy)"),
+            ]),
+            ("Price_Ladder — per category, ranked cheapest->priciest per sheet", [
+                ("rank", "1 = cheapest per 100 ply-sheets (falls back to per 100 pulls)"),
+                ("ply / units_per_pack / total_pulls", "format of the SKU"),
+                ("median_per_100_ply_sheets / _pulls", "the ladder metrics (see above)"),
+                ("median_rating / review_count", "quality + popularity"),
+                ("n_obs", "sightings -> confidence (>=4 solid, 2 = directional)"),
+            ]),
+            ("Ladder_by_Ply_Pack — like-for-like: category -> ply -> pack size", [
+                ("category / ply / pack", "the segment (e.g. Toilet, 3ply, pack of 6)"),
+                ("rank_in_segment", "1 = cheapest WITHIN that exact ply+pack segment"),
+                ("median_SP", "median selling price of the SKU"),
+                ("median_per_100_pulls / _ply_sheets", "per-sheet price for ranking"),
+                ("median_rating / review_count / n_obs", "quality, popularity, confidence"),
+            ]),
+        ]
+        for header, cols in defs:
+            line(header, bold)
+            for name, desc in cols:
+                ws.append(["", name, desc])
+            line()
+        ws.column_dimensions["A"].width = 4
+        ws.column_dimensions["B"].width = 28
+        ws.column_dimensions["C"].width = 90
+        return ws
+
     def style_header(ws):
         for c in ws[1]:
             c.font = Font(bold=True)
@@ -183,6 +257,7 @@ def main() -> int:
                         row[5], row[6], row[7], row[8], row[9]])
     style_header(ws4)
 
+    build_readme(wb)  # inserted as the first sheet
     out = EXPORTS / f"SOS_Price_Ladders_{date.today().isoformat()}.xlsx"
     wb.save(out)
     print(f"Wrote {out}")
