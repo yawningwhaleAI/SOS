@@ -31,7 +31,7 @@ from parse_attributes import parse_all  # noqa: E402
 DB = ROOT / "data" / "sos.db"
 REVIEW = ROOT / "review_queue"
 
-DERIVED = ["evidence_log", "price_observations", "listings", "canonical_skus"]
+DERIVED = ["evidence_log", "market_observations", "price_observations", "listings", "canonical_skus"]
 
 
 def clear_derived(conn):
@@ -88,6 +88,27 @@ def add_price_obs(conn, obs, sku_id, metrics):
     )
 
 
+def _num(x):
+    if x is None:
+        return None
+    try:
+        return float(str(x).replace(",", "").strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def add_market_obs(conn, obs, sku_id):
+    conn.execute(
+        "INSERT INTO market_observations(obs_id,canonical_sku_id,platform,locality,scraped_at,"
+        "search_query,search_rank,is_sponsored,rating,review_count,badge,in_stock) "
+        "VALUES(?,?,?,?,?,?,?,?,?,?,?,?)",
+        (obs["obs_id"], sku_id, obs["platform"], obs["locality"], obs["scraped_at"],
+         obs["query"], obs["search_rank"], obs["is_sponsored"],
+         _num(obs["rating_raw"]), _num(obs["review_count_raw"]), obs["badge_raw"],
+         obs["stock_status_raw"]),
+    )
+
+
 def add_evidence(conn, obs_id, field, raw, extracted, method, conf):
     conn.execute(
         "INSERT INTO evidence_log(obs_id,field_name,raw_value,extracted_value,"
@@ -141,6 +162,7 @@ def main() -> int:
         link_listing(conn, o["platform"], o["url"], sku_id, method, conf)
         metrics = compute_metrics(attrs, o["mrp_raw"], o["price_raw"])
         add_price_obs(conn, o, sku_id, metrics)
+        add_market_obs(conn, o, sku_id)
 
         # evidence for the fields that drive the analysis
         add_evidence(conn, o["obs_id"], "total_pulls", o["pack_size_raw"],
