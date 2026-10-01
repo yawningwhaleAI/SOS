@@ -257,6 +257,17 @@ def parse_pack_combined(name: str, pack: str) -> dict[str, Any]:
         if n_in_1 and units == 1 and pack_n is None:
             units = n_in_1
 
+    # multiplier adjacent to a unit word, e.g. "100 Pull x 3" or "3 x 100 pulls".
+    # Only when units isn't confidently set, and only next to a unit word (so it
+    # never grabs a sheet dimension like "30 x 23 cm").
+    if (units is None or units == 1):
+        m1 = re.search(r"(?:pulls?|sheets?|tissues?|wipes?|napkins?|pcs|pieces)\s*x\s*(\d+)", combined)
+        m2 = re.search(r"(\d+)\s*x\s*\d*\s*(?:pulls?|sheets?|tissues?|wipes?|napkins?)", combined)
+        if m1:
+            units = int(m1.group(1))
+        elif m2:
+            units = int(m2.group(1))
+
     if units is None:
         units = 1
     total = units * pulls if (units and pulls) else None
