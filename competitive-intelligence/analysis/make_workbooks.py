@@ -48,13 +48,15 @@ def hdr(ws):
 def load_skus(conn):
     conn.row_factory = sqlite3.Row
     skus = {r['canonical_sku_id']: dict(r) for r in conn.execute("SELECT * FROM canonical_skus")}
-    rows = conn.execute("""SELECT p.canonical_sku_id id,p.selling_price sp,p.mrp,p.discount_pct disc,
-        p.price_per_100_pulls pp,p.price_per_100_ply_sheets pps,r.product_name_raw name,r.platform,r.url,
+    has_flag = "review_flag" in {c[1] for c in conn.execute("PRAGMA table_info(price_observations)")}
+    flagsel = "p.review_flag flag," if has_flag else "NULL flag,"
+    rows = conn.execute(f"""SELECT p.canonical_sku_id id,p.selling_price sp,p.mrp,p.discount_pct disc,
+        p.price_per_100_pulls pp,p.price_per_100_ply_sheets pps,{flagsel} r.product_name_raw name,r.platform,r.url,
         m.rating rt,m.review_count rc
         FROM price_observations p JOIN raw_observations r ON r.obs_id=p.obs_id
         LEFT JOIN market_observations m ON m.obs_id=p.obs_id
         WHERE p.is_clean=1 AND p.selling_price IS NOT NULL""").fetchall()
-    agg = defaultdict(lambda: {'sp': [], 'mrp': [], 'disc': [], 'pp': [], 'pps': [], 'rt': [], 'rc': [], 'name': [], 'plat': set(), 'url': None})
+    agg = defaultdict(lambda: {'sp': [], 'mrp': [], 'disc': [], 'pp': [], 'pps': [], 'rt': [], 'rc': [], 'name': [], 'plat': set(), 'url': None, 'flag': None})
     for r in rows:
         a = agg[r['id']]; a['sp'].append(r['sp'])
         for k, f in [('mrp', 'mrp'), ('disc', 'disc'), ('pp', 'pp'), ('pps', 'pps'), ('rt', 'rt')]:
@@ -63,6 +65,7 @@ def load_skus(conn):
         if r['name']: a['name'].append(r['name'])
         a['plat'].add(r['platform'])
         if r['url'] and not a['url']: a['url'] = r['url']
+        if r['flag'] and not a['flag']: a['flag'] = r['flag']
     SKU = {}
     for sid, a in agg.items():
         s = skus.get(sid, {})
@@ -71,7 +74,8 @@ def load_skus(conn):
             claims=", ".join(json.loads(s.get('claims') or "[]")),
             name=Counter(a['name']).most_common(1)[0][0] if a['name'] else sid,
             mrp=med(a['mrp']), sp=med(a['sp']), disc=med(a['disc']), pp=med(a['pp']), pps=med(a['pps']),
-            rt=med(a['rt']), rc=max(a['rc']) if a['rc'] else 0, plat=",".join(sorted(a['plat'])), url=a['url'] or "")
+            rt=med(a['rt']), rc=max(a['rc']) if a['rc'] else 0, plat=",".join(sorted(a['plat'])),
+            url=a['url'] or "", flag=a['flag'] or "")
     return SKU
 
 
@@ -80,19 +84,20 @@ def build_table_workbook(SKU):
     # Sheet 1: flat table
     ws = wb.active; ws.title = "Brand_Product_Table"
     cols = ["Brand", "Product", "Category", "Ply", "Pack (units)", "Total sheets", "MRP", "Selling price",
-            "Discount %", "₹/100 sheets", "Rating", "Reviews", "Material", "Claims", "Platforms", "Product URL"]
+            "Discount %", "₹/100 sheets", "Rating", "Reviews", "Material", "Claims", "Platforms", "Review flag", "Product URL"]
     ws.append(cols)
     for s in sorted(SKU.values(), key=lambda x: (x['cat'], x['brand'], -(x['rc'] or 0))):
         ws.append([s['brand'], s['name'][:70], s['cat'], s['ply'], s['units'], s['total'], s['mrp'], s['sp'],
                    round(s['disc'], 2) if s['disc'] is not None else None, s['pp'], s['rt'], s['rc'],
-                   s['material'], s['claims'], s['plat'], s['url']])
-    hdr(ws); ws.freeze_panes = "C2"; ws.auto_filter.ref = f"A1:P{ws.max_row}"
+                   s['material'], s['claims'], s['plat'], s['flag'], s['url']])
+    hdr(ws); ws.freeze_panes = "C2"; ws.auto_filter.ref = f"A1:Q{ws.max_row}"
     for r in ws.iter_rows(min_row=2):
         rupee(r[6]); rupee(r[7]); pct(r[8])
-        u = r[15]
+        if r[15].value: r[15].fill = SOSF
+        u = r[16]
         if isinstance(u.value, str) and u.value.startswith("http"):
             u.hyperlink = u.value; u.font = Font(color="0563C1", underline="single")
-    for i, w in enumerate([15, 42, 13, 5, 11, 11, 8, 11, 10, 12, 7, 8, 12, 24, 16, 46], 1):
+    for i, w in enumerate([15, 42, 13, 5, 11, 11, 8, 11, 10, 12, 7, 8, 12, 24, 16, 18, 46], 1):
         ws.column_dimensions[get_column_letter(i)].width = w
 
     # Sheet 2: benchmarks
@@ -163,6 +168,41 @@ def build_table_workbook(SKU):
         pct(ws.cell(r, 8)); pct(ws.cell(r, 9)); ws.cell(r, 5).fill = SOSF
     ws.column_dimensions['A'].width = 22
     for col in "BCDEFGHIJKLM": ws.column_dimensions[col].width = 15
+
+    # Sheet 4: Audit (every dropped + flagged row, for transparency)
+    conn = sqlite3.connect(DB); conn.row_factory = sqlite3.Row
+    cols_pi = {c[1] for c in conn.execute("PRAGMA table_info(price_observations)")}
+    if "is_clean" in cols_pi:
+        flagcol = "p.review_flag" if "review_flag" in cols_pi else "NULL"
+        arows = conn.execute(f"""SELECT
+            CASE WHEN p.is_clean=0 THEN 'DROPPED' ELSE 'FLAGGED' END status,
+            COALESCE(p.drop_reason,{flagcol}) reason, s.category cat, s.brand,
+            r.product_name_raw name, p.selling_price sp, p.mrp, p.price_per_100_pulls pp, r.url
+            FROM price_observations p JOIN canonical_skus s ON s.canonical_sku_id=p.canonical_sku_id
+            JOIN raw_observations r ON r.obs_id=p.obs_id
+            WHERE p.is_clean=0 OR {flagcol} IS NOT NULL
+            ORDER BY status, reason, s.category""").fetchall()
+        wsa = wb.create_sheet("Audit")
+        wsa.append(["Status", "Reason", "Category", "Brand", "Product", "Selling price", "MRP", "₹/100 sheets", "Product URL"])
+        seen = set()
+        for a in arows:
+            key = (a['name'], a['sp'], a['reason'])
+            if key in seen: continue
+            seen.add(key)
+            wsa.append([a['status'], a['reason'], a['cat'], bclean(a['brand']), (a['name'] or "")[:60],
+                        a['sp'], a['mrp'], a['pp'], a['url'] or ""])
+        hdr(wsa); wsa.freeze_panes = "A2"; wsa.auto_filter.ref = f"A1:I{wsa.max_row}"
+        red = PatternFill("solid", fgColor="F4CCCC")
+        for r in wsa.iter_rows(min_row=2):
+            rupee(r[5]); rupee(r[6])
+            if r[0].value == "DROPPED": r[0].fill = red
+            else: r[0].fill = SOSF
+            u = r[8]
+            if isinstance(u.value, str) and u.value.startswith("http"):
+                u.hyperlink = u.value; u.font = Font(color="0563C1", underline="single")
+        for i, w in enumerate([10, 20, 13, 15, 52, 12, 10, 13, 46], 1):
+            wsa.column_dimensions[get_column_letter(i)].width = w
+    conn.close()
     return wb, bandref
 
 

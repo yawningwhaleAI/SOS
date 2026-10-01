@@ -52,6 +52,10 @@ NAME_CAT = [  # (keyword in name, category it implies)
 ]
 PER_SHEET_LOW = 1.0
 OUTLIER_FACTOR = 3.0
+# Variant/multipack detection thresholds (cross-category).
+PER_SHEET_CAT_FACTOR = 2.5  # a row's ₹/100 > this x category median => almost certainly an error
+MULTIPACK_CUES = re.compile(
+    r"(pack of\s*\d+|set of\s*\d+|combo|multi\s*pack|family pack|\bsaver\b|\bbundle\b|buy\s*\d+\s*get|\bx\s*\d+\b)")
 # Minimum plausible sheets-per-unit by category. A roll/box with fewer sheets
 # than this is a pack misparse (not a price judgement, so premium items survive).
 MIN_PULLS_PER_UNIT = {"Toilet": 40, "Kitchen towel": 15, "Facial": 30,
@@ -64,6 +68,8 @@ def ensure_columns(conn):
         conn.execute("ALTER TABLE price_observations ADD COLUMN is_clean INTEGER")
     if "drop_reason" not in cols:
         conn.execute("ALTER TABLE price_observations ADD COLUMN drop_reason TEXT")
+    if "review_flag" not in cols:
+        conn.execute("ALTER TABLE price_observations ADD COLUMN review_flag TEXT")
 
 
 def main() -> int:
@@ -75,19 +81,33 @@ def main() -> int:
     rows = conn.execute("""
       SELECT p.price_obs_id, p.canonical_sku_id, p.selling_price, p.mrp,
              p.discount_pct, p.price_per_100_pulls,
-             s.category, s.total_pulls, s.pulls_per_unit, r.product_name_raw, r.is_substitute
+             s.category, s.total_pulls, s.pulls_per_unit, s.units_per_pack,
+             r.product_name_raw, r.is_substitute
       FROM price_observations p
       JOIN canonical_skus s ON s.canonical_sku_id=p.canonical_sku_id
       JOIN raw_observations r ON r.obs_id=p.obs_id
     """).fetchall()
 
-    # SKU median SP from rows that pass basic price validity (for the outlier test)
+    def basic_ok(r):
+        return r["selling_price"] and r["selling_price"] > 0 and (
+            r["mrp"] is None or r["selling_price"] <= r["mrp"])
+
+    # SKU median SP (for the within-SKU outlier test)
     valid_sp = defaultdict(list)
+    # category single-pack median SP + category median ₹/100 (for variant detection)
+    cat_single_sp = defaultdict(list)
+    cat_pp = defaultdict(list)
     for r in rows:
-        if r["selling_price"] and r["selling_price"] > 0 and (
-                r["mrp"] is None or r["selling_price"] <= r["mrp"]):
-            valid_sp[r["canonical_sku_id"]].append(r["selling_price"])
+        if not basic_ok(r):
+            continue
+        valid_sp[r["canonical_sku_id"]].append(r["selling_price"])
+        if (r["units_per_pack"] in (None, 1)):
+            cat_single_sp[r["category"]].append(r["selling_price"])
+        if r["price_per_100_pulls"] is not None:
+            cat_pp[r["category"]].append(r["price_per_100_pulls"])
     sku_med = {k: statistics.median(v) for k, v in valid_sp.items() if len(v) >= 3}
+    cat_single_med = {k: statistics.median(v) for k, v in cat_single_sp.items() if len(v) >= 3}
+    cat_pp_med = {k: statistics.median(v) for k, v in cat_pp.items() if len(v) >= 3}
 
     updates = []
     dropped = []
@@ -127,16 +147,37 @@ def main() -> int:
                 if m > 0 and (sp > OUTLIER_FACTOR * m or sp < m / OUTLIER_FACTOR):
                     reason = "sku_price_outlier"
 
+        units = r["units_per_pack"]
+        # HARD DROP: pack-normalised per-sheet price far off the category norm.
+        # This is the robust variant/misparse catch — it does NOT punish large or
+        # premium single packs (those are normal on a per-sheet basis).
+        if (reason is None and cat in SHEET_CATEGORIES and pps and cat_pp_med.get(cat)
+                and pps > PER_SHEET_CAT_FACTOR * cat_pp_med[cat]):
+            reason = "per_sheet_cat_outlier"
+
+        # SOFT FLAG (kept in analysis): name hints at a multipack but it parsed as a
+        # single unit -> possible under-captured pack. Surfaced for manual review,
+        # NOT dropped, because the per-sheet price may still be correct.
+        flag = None
+        if reason is None and units in (None, 1) and MULTIPACK_CUES.search(name):
+            flag = "multipack_name_check"
+
         is_clean = 0 if reason else 1
-        updates.append((is_clean, reason, r["price_obs_id"]))
+        updates.append((is_clean, reason, flag, r["price_obs_id"]))
         if reason:
             reason_counts[reason] += 1
-            dropped.append({"price_obs_id": r["price_obs_id"], "reason": reason,
+            dropped.append({"price_obs_id": r["price_obs_id"], "status": "DROPPED", "reason": reason,
+                            "sku": r["canonical_sku_id"], "category": cat,
+                            "selling_price": sp, "mrp": mrp,
+                            "price_per_100_pulls": pps, "name": r["product_name_raw"]})
+        elif flag:
+            reason_counts["(flagged) " + flag] += 1
+            dropped.append({"price_obs_id": r["price_obs_id"], "status": "FLAGGED", "reason": flag,
                             "sku": r["canonical_sku_id"], "category": cat,
                             "selling_price": sp, "mrp": mrp,
                             "price_per_100_pulls": pps, "name": r["product_name_raw"]})
 
-    conn.executemany("UPDATE price_observations SET is_clean=?, drop_reason=? WHERE price_obs_id=?", updates)
+    conn.executemany("UPDATE price_observations SET is_clean=?, drop_reason=?, review_flag=? WHERE price_obs_id=?", updates)
     conn.commit()
 
     total = len(rows)
